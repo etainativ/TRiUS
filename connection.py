@@ -1,6 +1,8 @@
-from scapy.all import TCP, IP, send
+from scapy.all import TCP, IP, conf, L3RawSocket, send
 import enum
 
+conf.L3socket = L3RawSocket
+conf.verb = 0
 connections = []
 
 FIN=0x01
@@ -27,9 +29,11 @@ STATES = enum.Enum("TCP_STATE", [
 
 def pp(msg, ip, con=None):
     tcp = ip[1]
-    msg = "{:20} {}:{}-->{}:{} flags {:4} {:10}/{:10}".format(msg, ip.src, tcp.sport, ip.dst, tcp.dport, tcp.flags.flagrepr(), tcp.seq, tcp.ack)
+    msg = "{:20} {}:{}-->{}:{} flags {:4} {:10}/{:10}".format(
+            msg, ip.src, tcp.sport, ip.dst, tcp.dport,
+            tcp.flags.flagrepr(), tcp.seq, tcp.ack)
     if con is not None:
-        msg += ", con_down: {}".format(con.con_down)
+        msg += ", state: {}".format(con.state)
     print(msg)
 
 def _drop(pkt):
@@ -46,6 +50,9 @@ def send_local(msg, pkt):
     pp("Local " + msg, ip)
     send(pkt, iface="lo")
 
+def rebuild_pkt(pkt, ip):
+    pkt.set_payload(ip.build())
+
 
 class Connection:
     __slots__ = [
@@ -56,12 +63,17 @@ class Connection:
             'initial_local_port',
             'local_seq',
             'remote_seq',
-            'con_down',
             'is_bind',
             'state',
             'delta']
 
-    def __init__(self, local_ip, remote_ip, local_port, remote_port, is_bind):
+    def __init__(
+            self,
+            local_ip,
+            remote_ip,
+            local_port,
+            remote_port,
+            is_bind):
         self.local_addr = local_ip
         self.local_port = local_port
         self.remote_addr = remote_ip
@@ -71,7 +83,10 @@ class Connection:
         self.is_bind = is_bind
         self.local_seq = 0
         self.remote_seq = 0
-        self.con_down = 0
+
+        # the first time we initiatied the connection
+        # the state is really STATES.SYN-SENT but next ack
+        # will set the state toi STATES.ESTABLISHED
         self.state = STATES.ESTABLISHED
 
     incomming = {}
@@ -79,36 +94,125 @@ class Connection:
 
     def register_state(state, direction):
         def _f(func):
+            if state in direction:
+                raise Exception("multyple {} definitions".format(state))
             direction[state] = func
             return func
 
         return _f
 
+    def update_tcp(self, pkt, ip, tcp, is_ongoing):
+        if is_ongoing:
+            self.remote_seq = tcp.ack
+            tcp.seq -= self.delta
+            tcp.sport = self.initial_local_port
+
+        else:
+            self.local_seq = tcp.ack
+            tcp.ack += self.delta
+            tcp.dport = self.local_port
+
+        del(tcp.chksum)
+        pp("Adter update:", ip)
+        rebuild_pkt(pkt, ip)
 
     @register_state(STATES.ESTABLISHED, outgoing)
-    def on_established_outgoing(pkt, ip, tcp):
+    def on_established_outgoing(self, pkt, ip, tcp):
         if FIN & tcp.flags:
             self.end_fin()
-            # time wait?!?
-            self.state = STATES.CLOSED
+            self.state = STATES.FIN_WAIT_1
             return _drop(pkt)
 
         if RST & tcp.flags:
             self.state = STATES.CLOSED
+            # rst sequence?
             return _drop(pkt)
 
-
-
-    def pass_pkt(pkt, ip, tcp):
+        self.update_tcp(pkt, ip, tcp, True)
         return _accept(pkt)
 
-    def pkt_incomming(pkt, ip, tcp):
-        self.incoming.get(self.state, self.pass_pkt)(pkt, ip ,tcp)
+    @register_state(STATES.ESTABLISHED, incomming)
+    def on_established_incomming(self, pkt, ip, tcp):
+        # TODO disconnect sequences
+        self.update_tcp(pkt, ip, tcp, False)
+        return _accept(pkt)
 
-    def pkt_outgoing(pkt, ip, tcp):
-        self.outgoing.get(self.state, self.pass_pkt)(pkt, ip, tcp)
+
+    @register_state(STATES.SYN_RCV, outgoing)
+    def on_syn_rcv_outgoing(self, pkt, ip, tcp):
+        if SYN & tcp.flags and ACK & tcp.flags:
+            self.state = STATES.SYN_SENT
+            self.recover_ack(tcp)
+        if ACK & tcp.flags:
+            self.state = STATES.ESTABLISHED
+            self.local_seq += 1
+            pass
+        if RST & tcp.flags:
+            self.state = STATES.CLOSED
+            return _accept(pkt)
+        return _drop(pkt)
+
+    @register_state(STATES.CLOSED, outgoing)
+    def on_closed_outgoing(self, pkt, ip, tcp):
+        if tcp.flags & SYN:
+            self.state = STATES.SYN_SENT
+            self.recover_syn_ack(tcp)
+        return _drop(pkt)
+
+    @register_state(STATES.SYN_SENT, incomming)
+    def on_syn_sent_incomming(self, pkt, ip, tcp):
+        if tcp.flags & SYN and tcp.flags & ACK:
+            self.state = STATES.SYN_RCV
+            return _accept(pkt)
         
+        if tcp.flags & ACK:
+            self.state = STATES.ESTABLISHED
+            # should look into validity of the pkt
+            return _accept(pkt)
+        return _drop(pkt)
 
+    @register_state(STATES.CLOSED, incomming)
+    def on_closed_incomming(self, pkt, ip, tcp):
+        if tcp.flags & SYN:
+            self.state = STATES.SYN_RCV
+            return _accept(pkt)
+        return _drop(pkt)
+
+    @register_state(STATES.FIN_WAIT_1, incomming)
+    def on_fin_wait_1(self, pkt, ip, tcp):
+        # we dont distinguesh between fin_wait_1 and fin_wait_2
+        if tcp.flags & FIN:
+            self.state = STATES.CLOSED
+            return _accept(pkt)
+        return _drop(pkt)
+
+    @register_state(STATES.SYN_SENT, outgoing)
+    def on_syn_sent_incomming(self, pkt, ip, tcp):
+        if tcp.flags & ACK:
+            # TODO check ACK validity
+            self.local_seq += 1
+            self.state = STATES.ESTABLISHED
+            return _accept(pkt)
+        return _drop(pkt)
+
+    @staticmethod
+    def pass_pkt_incomming(self, pkt, ip, tcp):
+        self.update_tcp(pkt, ip, tcp, False)
+        return _accept(pkt)
+
+    @staticmethod
+    def pass_pkt_outgoing(self, pkt, ip, tcp):
+        self.update_tcp(pkt, ip, tcp, True)
+        return _accept(pkt)
+
+    def pkt_incomming(self, pkt, ip, tcp):
+        func = self.incomming.get(self.state, self.pass_pkt_incomming)
+        return func(self, pkt, ip ,tcp)
+
+    def pkt_outgoing(self, pkt, ip, tcp):
+        func = self.outgoing.get(self.state, self.pass_pkt_outgoing)
+        return func(self, pkt, ip, tcp)
+        
     def register(self):
         connections.append(self)
 
@@ -126,9 +230,26 @@ class Connection:
             sport=self.remote_port,
             seq=self.remote_seq - 1,
             ack=0,
-            flags = "S")
+            flags="S")
 
         send_local("SYN recover", ip/tcp)
+
+    def recover_syn_ack(self, tcp):
+        self.delta = tcp.seq + 1 - self.local_seq
+        self.local_seq = tcp.seq + 1
+        self.local_port = tcp.sport
+        ip = IP(
+            src=self.remote_addr,
+            dst=self.local_addr)
+
+        tcp = TCP(
+            dport=self.local_port,
+            sport=self.remote_port,
+            seq=self.remote_seq - 1,
+            ack=self.local_seq,
+            flags = "SA")
+
+        send_local("SYN-ACK", ip/tcp)
 
     def recover_ack(self, tcp):
         if not self.is_bind:
@@ -163,18 +284,20 @@ class Connection:
 
         send_local("FIN", ip/tcp)
 
+    def reset(self):
+        pass
 
 def get_connection(local_addr, remote_addr, local_port, remote_port):
     for connection in connections:
         if connection.local_addr == local_addr and \
             connection.remote_addr == remote_addr and \
-            connection.local_port == local_port and \
+            connection.initial_local_port == local_port and \
             connection.remote_port == remote_port:
                 return connection
     return None
 
 
-def get_old_connection(local_addr, remote_addr, local_port):
+def get_dup_connection(local_addr, remote_addr, local_port):
     for connection in connections:
         if connection.local_addr == local_addr and \
             connection.remote_addr == remote_addr and \
@@ -183,11 +306,10 @@ def get_old_connection(local_addr, remote_addr, local_port):
     return None
 
 
-def get_dup_connection(local_addr, remote_addr, remote_port):
+def get_old_connection(local_addr, remote_addr, remote_port):
     for connection in connections:
         if connection.local_addr == local_addr and \
             connection.remote_addr == remote_addr and \
             connection.remote_port == remote_port:
                 return connection
     return None
-    
