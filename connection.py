@@ -140,13 +140,13 @@ class Connection:
 
     @register_state(STATES.SYN_RCV, outgoing)
     def on_syn_rcv_outgoing(self, pkt, ip, tcp):
-        if SYN & tcp.flags and ACK & tcp.flags:
-            self.state = STATES.SYN_SENT
-            self.recover_ack(tcp)
         if ACK & tcp.flags:
-            self.state = STATES.ESTABLISHED
-            self.local_seq += 1
-            pass
+            if SYN & tcp.flags:
+                self.state = STATES.SYN_SENT
+                self.recover_ack(tcp)
+            else:
+                self.state = STATES.ESTABLISHED
+                self.local_seq += 1
         if RST & tcp.flags:
             self.state = STATES.CLOSED
             return _accept(pkt)
@@ -252,9 +252,6 @@ class Connection:
         send_local("SYN-ACK", ip/tcp)
 
     def recover_ack(self, tcp):
-        if not self.is_bind:
-            return
-
         self.delta = tcp.seq + 1 - self.local_seq
         self.local_seq = tcp.seq + 1
         ip = IP(

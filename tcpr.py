@@ -1,16 +1,21 @@
 from gevent.monkey import patch_all; patch_all()
 
+import nanomsg
 import gevent
 import gevent.socket
 import socket
 import signal
 import sys
+from tcpr_pb2 import tcpr, client
+from ipaddress import ip_address
 from scapy.all import TCP, IP
 from netfilterqueue import NetfilterQueue, Packet
-from connection import Connection, get_connection, get_old_connection, send_local, pp, connections, _accept, _drop
+from connection import Connection, get_connection, get_old_connection
+from connection import send_local, pp, connections, _accept, _drop
 
 
 pudb_active = False
+Running = True
 def pudb():
     global pudb_active
     if not pudb_active:
@@ -18,6 +23,7 @@ def pudb():
         from pudb import set_trace
         set_trace()
         pudb_active = False
+
 
 nf_queues = []
 sockets = []
@@ -42,7 +48,6 @@ ACK=0x10
 URG=0x20
 ECE=0x40
 CWR=0x80
-
 
 
 def create_nfqueue_thread(nfqueue_id, func):
@@ -107,23 +112,83 @@ def tcpr_peer(pkt):
 def keypress():
     while True:
         gevent.socket.wait_read(sys.stdin.fileno())
-        msg = sys.stdin.readline()
-        if msg.strip() == "r": 
+        msg = sys.stdin.readline().strip()
+        if msg == "r": 
             print("Recovering")
             for connection in connections:
                 connection.recover_syn()
             continue
 
-        if msg.strip() == "c": 
+        if msg == "c": 
             print("Clearing")
             while connections:
                 connections.pop().reset()
-
             continue
+
+        if msg == "l":
+            for connection in connections:
+                dummy_pkt = IP( src=connection.local_addr,
+                                dst=connection.remote_addr)/TCP( 
+                            sport=connection.local_port,
+                            dport=connection.remote_port,
+                            ack=connection.remote_seq,
+                            seq=connection.local_seq)
+                pp("Connection:", dummy_pkt, connection)
+            continue
+
+        print('''Commands:
+        r -- recover connections
+        c -- clear connections
+        l -- list connections''')
+
+def build_get_response():
+    msg = tcpr()
+    msg.get_response.clients.extend([ client(
+                local_ip=ip_address(connection.local_addr)._ip,
+                remote_ip=ip_address(connection.remote_addr)._ip,
+                local_port=connection.local_port,
+                remote_port=connection.remote_port,
+                local_seq=connection.local_seq,
+                remote_seq=connection.remote_seq,
+                init_local_seq=0)
+        for connection in connections])
+    return msg.SerializeToString()
+
+def set_connections(msg):
+    while connections:
+        connections.pop()
+
+    for con in msg.set.clients:
+        connection = Connection(
+                local_ip=str(ip_address(con.local_ip)),
+                remote_ip=str(ip_address(con.remote_ip)),
+                local_port=con.local_port,
+                remote_port=con.remote_port,
+                False)
+
+    resp = tcpr()
+    resp.set_response.SetInParent()
+    return resp.SerializeToString()
+
+def control_server():
+    s = nanomsg.Socket(nanomsg.REP)
+    s.recv_timeout = 0
+    s.bind("tcp://0.0.0.0:54748")
+    while True:
+        gevent.socket.wait_read(s.recv_fd)
+        msg = tcpr.FromString(s.recv())
+        mtype = msg.WhichOneof('message')
+        if mtype == 'get':
+            s.send(build_get_response())
+
+        if mtype == 'set':
+            s.send(set_connections(msg))
+
 
 if __name__ == "__main__":
     app_thread = create_nfqueue_thread(0, tcpr_application)
     peer_thread = create_nfqueue_thread(1, tcpr_peer)
     input_thread = gevent.spawn(keypress)
+    control_server = gevent.spawn(control_server)
 
     gevent.joinall([app_thread, peer_thread])
