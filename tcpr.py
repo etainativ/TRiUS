@@ -184,14 +184,16 @@ def set_connections(msg):
         connections.pop()
 
     for con in msg.set.clients:
-        Connection(
+        con = Connection(
                 local_ip=con.local_ip,
                 remote_ip=con.remote_ip,
                 local_port=con.local_port,
                 remote_port=con.remote_port,
                 is_bind=con.is_server,
                 local_seq=con.local_seq,
-                remote_seq=con.remote_seq).register()
+                remote_seq=con.remote_seq)
+        con.register()
+        con.recover_syn()
         
 
     resp = tcpr()
