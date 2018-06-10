@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+message client {
+	string local_ip = 1;
+	string remote_ip = 2;
+	uint32 local_port = 3;
+	uint32 remote_port = 4;
+	uint32 local_seq = 5;
+	uint32 remote_seq = 6;
+	uint32 init_local_seq = 7;
+	bool is_server = 8;
+}
+
+
+message tcpr_get_response {
+	repeated client clients = 1;
+}
+
+
+message tcpr_set {
+	repeated client clients = 1;
+}
+
+
+message tcpr_get {
+	string local_ip = 1;
+	string remote_ip = 2;
+	uint32 local_port = 3;
+	uint32 remote_port = 4;
+}
+
+
+message tcpr_set_response {}
+
+
+message tcpr {
+	oneof message {
+		tcpr_get get = 1;
+		tcpr_set set = 2;
+		tcpr_get_response get_response = 3;
+		tcpr_set_response set_response = 4;
+	}
+}

@@ -6,12 +6,14 @@ import gevent.socket
 import socket
 import signal
 import sys
+
 from tcpr_pb2 import tcpr, client
 from ipaddress import ip_address
-from scapy.all import TCP, IP
+from scapy.all import TCP, IP, IPv6
 from netfilterqueue import NetfilterQueue, Packet
-from connection import Connection, get_connection, get_old_connection
-from connection import send_local, pp, connections, _accept, _drop
+from connection import Connection, get_connection
+from connection import connections, get_old_connection
+from utils import pp, _accept
 
 
 pudb_active = False
@@ -59,8 +61,15 @@ def create_nfqueue_thread(nfqueue_id, func):
     return gevent.spawn(nfqueue.run_socket, s)
 
 
-def tcpr_application(pkt):
+def tcpr4_application(pkt):
     ip = IP(pkt.get_payload())
+    return tcpr_application(pkt, ip)
+
+def tcpr6_application(pkt):
+    ip = IPv6(pkt.get_payload())
+    return tcpr_application(pkt, ip)
+
+def tcpr_application(pkt, ip):
     tcp = ip.getlayer(TCP)
     con = get_connection(ip.src, ip.dst, tcp.sport, tcp.dport)
     pp("Application:", ip, con)
@@ -87,11 +96,18 @@ def tcpr_application(pkt):
             pp("new Connection:", ip)
             con.register()
 
-    return _accept(pkt)
+    return _accept(pkt, ip)
 
 
-def tcpr_peer(pkt):
+def tcpr4_peer(pkt):
     ip = IP(pkt.get_payload())
+    return tcpr_peer(pkt, ip)
+
+def tcpr6_peer(pkt):
+    ip = IPv6(pkt.get_payload())
+    return tcpr_peer(pkt, ip)
+
+def tcpr_peer(pkt, ip):
     tcp = ip.getlayer(TCP)
     con = get_connection(ip.dst, ip.src, tcp.dport, tcp.sport)
 
@@ -106,50 +122,59 @@ def tcpr_peer(pkt):
 
     
     print("Did not find any connection")
-    return _accept(pkt)
+    return _accept(pkt, ip)
 
 
 def keypress():
     while True:
-        gevent.socket.wait_read(sys.stdin.fileno())
-        msg = sys.stdin.readline().strip()
-        if msg == "r": 
-            print("Recovering")
-            for connection in connections:
-                connection.recover_syn()
-            continue
+        try:
+            gevent.socket.wait_read(sys.stdin.fileno())
+            msg = sys.stdin.readline().strip()
+            if msg == "r": 
+                print("Recovering")
+                for connection in connections:
+                    connection.recover_syn()
+                continue
 
-        if msg == "c": 
-            print("Clearing")
-            while connections:
-                connections.pop().reset()
-            continue
+            if msg == "c": 
+                print("Clearing")
+                while connections:
+                    connections.pop().reset()
+                continue
 
-        if msg == "l":
-            for connection in connections:
-                dummy_pkt = IP( src=connection.local_addr,
-                                dst=connection.remote_addr)/TCP( 
-                            sport=connection.local_port,
-                            dport=connection.remote_port,
-                            ack=connection.remote_seq,
-                            seq=connection.local_seq)
-                pp("Connection:", dummy_pkt, connection)
-            continue
+            if msg == "l":
+                for connection in connections:
+                    ip_type = IP 
+                    addr = connection.remote_addr
+                    if ip_address(addr).version == 6:
+                        ip_type = IPv6
 
-        print('''Commands:
-        r -- recover connections
-        c -- clear connections
-        l -- list connections''')
+                    dummy_pkt = ip_type( src=connection.local_addr,
+                                         dst=connection.remote_addr)/TCP( 
+                                sport=connection.local_port,
+                                dport=connection.remote_port,
+                                ack=connection.remote_seq,
+                                seq=connection.local_seq)
+                    pp("Connection:", dummy_pkt, connection)
+                continue
+
+            print('''Commands:
+            r -- recover connections
+            c -- clear connections
+            l -- list connections''')
+        except Exception as e:
+            print(e)
 
 def build_get_response():
     msg = tcpr()
     msg.get_response.clients.extend([ client(
-                local_ip=ip_address(connection.local_addr)._ip,
-                remote_ip=ip_address(connection.remote_addr)._ip,
+                local_ip=connection.local_addr,
+                remote_ip=connection.remote_addr,
                 local_port=connection.local_port,
                 remote_port=connection.remote_port,
                 local_seq=connection.local_seq,
                 remote_seq=connection.remote_seq,
+                is_server=connection.is_bind,
                 init_local_seq=0)
         for connection in connections])
     return msg.SerializeToString()
@@ -159,12 +184,15 @@ def set_connections(msg):
         connections.pop()
 
     for con in msg.set.clients:
-        connection = Connection(
-                local_ip=str(ip_address(con.local_ip)),
-                remote_ip=str(ip_address(con.remote_ip)),
+        Connection(
+                local_ip=con.local_ip,
+                remote_ip=con.remote_ip,
                 local_port=con.local_port,
                 remote_port=con.remote_port,
-                False)
+                is_bind=con.is_server,
+                local_seq=con.local_seq,
+                remote_seq=con.remote_seq).register()
+        
 
     resp = tcpr()
     resp.set_response.SetInParent()
@@ -186,8 +214,10 @@ def control_server():
 
 
 if __name__ == "__main__":
-    app_thread = create_nfqueue_thread(0, tcpr_application)
-    peer_thread = create_nfqueue_thread(1, tcpr_peer)
+    app_thread = create_nfqueue_thread(0, tcpr4_application)
+    peer_thread = create_nfqueue_thread(1, tcpr4_peer)
+    app_thread = create_nfqueue_thread(2, tcpr6_application)
+    peer_thread = create_nfqueue_thread(3, tcpr6_peer)
     input_thread = gevent.spawn(keypress)
     control_server = gevent.spawn(control_server)
 
