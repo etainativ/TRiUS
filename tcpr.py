@@ -133,7 +133,7 @@ def keypress():
             if msg == "r": 
                 print("Recovering")
                 for connection in connections:
-                    connection.recover_syn()
+                    connection.recover()
                 continue
 
             if msg == "c": 
@@ -193,7 +193,7 @@ def set_connections(msg):
                 local_seq=con.local_seq,
                 remote_seq=con.remote_seq)
         con.register()
-        con.recover_syn()
+        con.recover()
         
 
     resp = tcpr()

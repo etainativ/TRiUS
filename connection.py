@@ -21,7 +21,7 @@ STATES = enum.Enum("TCP_STATE", [
     "CLOSED",
     "RECOVER",
     "LISTEN",
-    "SYN_RCV",
+    "SYN_RECV",
     "SYN_SENT",
     "ESTABLISHED",
     "FIN_WAIT_1",
@@ -32,7 +32,11 @@ STATES = enum.Enum("TCP_STATE", [
 
 def send_local(msg, pkt, socket_type):
     pp("Local " + msg, pkt)
-    send(pkt, iface="lo", socket=socket_type)
+    send(pkt, iface="lo", socket=socket_type())
+
+def send_remote(msg, pkt, socket_type):
+    pp("Remote " + msg, pkt)
+    send(pkt, socket=socket_type())
 
 def rebuild_pkt(pkt, ip):
     pkt.set_payload(ip.build())
@@ -46,7 +50,6 @@ class Connection:
             'remote_port',
             'initial_local_port',
             'local_seq',
-            'remote_seq',
             'is_bind',
             'is_v6',
             'socket_type',
@@ -61,8 +64,7 @@ class Connection:
             local_port,
             remote_port,
             is_bind,
-            local_seq=0,
-            remote_seq=0):
+            local_seq=0):
         self.local_addr = local_ip
         self.local_port = local_port
         self.remote_addr = remote_ip
@@ -71,10 +73,9 @@ class Connection:
         self.delta = 0
         self.is_bind = is_bind
         self.local_seq = local_seq 
-        self.remote_seq = remote_seq
 
         is_v6 = ipaddress.ip_address(self.remote_addr).version == 6
-        self.socket_type = L3RawSocket6() if is_v6 else L3RawSocket()
+        self.socket_type = L3RawSocket6 if is_v6 else L3RawSocket
         self.ip_type = IPv6 if is_v6 else IP 
         # the first time we initiatied the connection
         # the state is really STATES.SYN-SENT but next ack
@@ -95,7 +96,6 @@ class Connection:
 
     def update_tcp(self, pkt, ip, tcp, is_ongoing):
         if is_ongoing:
-            self.remote_seq = tcp.ack
             tcp.seq -= self.delta
             tcp.sport = self.initial_local_port
 
@@ -111,7 +111,7 @@ class Connection:
     @register_state(STATES.ESTABLISHED, outgoing)
     def on_established_outgoing(self, pkt, ip, tcp):
         if FIN & tcp.flags:
-            self.end_fin()
+            self.end_fin(tcp)
             self.state = STATES.FIN_WAIT_1
             return _drop(pkt, ip)
 
@@ -129,32 +129,60 @@ class Connection:
         self.update_tcp(pkt, ip, tcp, False)
         return _accept(pkt, ip)
 
-
-    @register_state(STATES.SYN_RCV, outgoing)
+    @register_state(STATES.SYN_RECV, outgoing)
     def on_syn_rcv_outgoing(self, pkt, ip, tcp):
         if ACK & tcp.flags:
             if SYN & tcp.flags:
-                self.state = STATES.SYN_SENT
                 self.recover_ack(tcp)
             else:
                 self.state = STATES.ESTABLISHED
-                self.local_seq += 1
         if RST & tcp.flags:
             self.state = STATES.CLOSED
+            return _accept(pkt, ip)
+        return _drop(pkt, ip)
+
+    @register_state(STATES.SYN_RECV, incomming)
+    def on_syn_rcv_outgoing(self, pkt, ip, tcp):
+        if ACK == tcp.flags:
+            self.state = STATES.ESTABLISHED
             return _accept(pkt, ip)
         return _drop(pkt, ip)
 
     @register_state(STATES.CLOSED, outgoing)
     def on_closed_outgoing(self, pkt, ip, tcp):
         if tcp.flags & SYN:
+            self.state = STATES.RECOVER
+            self.recover_seq_ack(pkt, ip, tcp)
+            return _accept(pkt, ip)
+        return _drop(pkt, ip)
+
+    @register_state(STATES.RECOVER, incomming)
+    def on_recover_incomming(self, pkt, ip, tcp):
+        if tcp.flags & RST:
+            print("Session RESTED by peer")
+            connections.pop(self)
+
+        if tcp.flags == ACK:
             self.state = STATES.SYN_SENT
-            self.recover_syn_ack(tcp)
+            self.recover_syn_ack_local(tcp)
+        
+        return _drop(pkt, ip)
+
+    @register_state(STATES.LISTEN, incomming)
+    def on_listen_incomming(self, pkt, ip, tcp):
+        if tcp.flags == ACK:
+            self.recover_syn(tcp)
+
+        if tcp.flags == SYN:
+            self.state = STATES.SYN_RECV
+            _accept(pkt, ip)
+
         return _drop(pkt, ip)
 
     @register_state(STATES.SYN_SENT, incomming)
     def on_syn_sent_incomming(self, pkt, ip, tcp):
         if tcp.flags & SYN and tcp.flags & ACK:
-            self.state = STATES.SYN_RCV
+            self.state = STATES.SYN_RECV
             return _accept(pkt, ip)
         
         if tcp.flags & ACK:
@@ -166,7 +194,7 @@ class Connection:
     @register_state(STATES.CLOSED, incomming)
     def on_closed_incomming(self, pkt, ip, tcp):
         if tcp.flags & SYN:
-            self.state = STATES.SYN_RCV
+            self.state = STATES.SYN_RECV
             return _accept(pkt, ip)
         return _drop(pkt, ip)
 
@@ -175,15 +203,6 @@ class Connection:
         # we dont distinguesh between fin_wait_1 and fin_wait_2
         if tcp.flags & FIN:
             self.state = STATES.CLOSED
-            return _accept(pkt, ip)
-        return _drop(pkt, ip)
-
-    @register_state(STATES.SYN_SENT, outgoing)
-    def on_syn_sent_incomming(self, pkt, ip, tcp):
-        if tcp.flags & ACK:
-            # TODO check ACK validity
-            self.local_seq += 1
-            self.state = STATES.ESTABLISHED
             return _accept(pkt, ip)
         return _drop(pkt, ip)
 
@@ -208,10 +227,14 @@ class Connection:
     def register(self):
         connections.append(self)
 
-    def recover_syn(self):
-        if not self.is_bind:
-            return
+    def recover_seq_ack(self, pkt, ip, tcp):
+        self.local_seq = tcp.seq
+        self.local_port = tcp.sport
+        tcp.flags = "A"
+        rebuild_pkt(pkt, ip)
 
+    def recover_syn(self, tcp):
+        self.local_seq = tcp.ack
         ip = self.ip_type(
             src=self.remote_addr,
             dst=self.local_addr)
@@ -219,16 +242,15 @@ class Connection:
         tcp = TCP(
             dport=self.local_port,
             sport=self.remote_port,
-            seq=self.remote_seq - 1,
+            seq=tcp.seq - 1,
             ack=0,
             flags="S")
 
         send_local("SYN recover", ip/tcp, self.socket_type)
 
-    def recover_syn_ack(self, tcp):
-        self.delta = tcp.seq + 1 - self.local_seq
-        self.local_seq = tcp.seq + 1
-        self.local_port = tcp.sport
+    def recover_syn_ack_local(self, tcp):
+        self.local_seq += 1
+        self.delta = self.local_seq - tcp.ack
 
         ip = self.ip_type(
             src=self.remote_addr,
@@ -237,16 +259,32 @@ class Connection:
         tcp = TCP(
             dport=self.local_port,
             sport=self.remote_port,
-            seq=self.remote_seq - 1,
-            ack=self.local_seq,
+            seq=tcp.seq - 1,
+            ack=(tcp.ack + self.delta) % (2 ** 32),
             flags = "SA")
 
         send_local("SYN-ACK", ip/tcp, self.socket_type)
 
+    def recover(self):
+        if not self.is_bind:
+            return
+
+        ip = self.ip_type(
+                src=self.local_addr,
+                dst=self.remote_addr)
+
+        tcp = TCP(
+                dport=self.remote_port,
+                sport=self.local_port,
+                seq=0,
+                ack=0,
+                flags="A")
+
+        send_remote("ACK", ip/tcp, self.socket_type)
+        self.state = STATES.LISTEN
+
     def recover_ack(self, tcp):
         self.delta = tcp.seq + 1 - self.local_seq
-        self.local_seq = tcp.seq + 1
-
         ip = self.ip_type(
             src=self.remote_addr,
             dst=self.local_addr)
@@ -254,13 +292,13 @@ class Connection:
         tcp = TCP(
             dport=self.local_port,
             sport=self.remote_port,
-            seq=self.remote_seq,
-            ack=self.local_seq,
-            flags = "A")
+            seq=tcp.ack,
+            ack=tcp.seq + 1,
+            flags="A")
 
         send_local("ACK", ip/tcp, self.socket_type)
 
-    def end_fin(self):
+    def end_fin(self, tcp):
         ip = self.ip_type(
             src=self.remote_addr,
             dst=self.local_addr)
@@ -268,8 +306,8 @@ class Connection:
         tcp = TCP(
             dport=self.local_port,
             sport=self.remote_port,
-            seq=self.remote_seq,
-            ack=self.local_seq + 1,
+            seq=tcp.ack,
+            ack=tcp.seq + 1,
             flags="FA")
 
         send_local("FIN", ip/tcp, self.socket_type)
