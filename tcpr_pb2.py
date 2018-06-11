@@ -3,6 +3,7 @@
 
 import sys
 _b=sys.version_info[0]<3 and (lambda x:x) or (lambda x:x.encode('latin1'))
+from google.protobuf.internal import enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
 from google.protobuf import reflection as _reflection
@@ -19,72 +20,81 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='tcpr.proto',
   package='',
   syntax='proto3',
-  serialized_pb=_b('\n\ntcpr.proto\"\xa8\x01\n\x06\x63lient\x12\x10\n\x08local_ip\x18\x01 \x01(\t\x12\x11\n\tremote_ip\x18\x02 \x01(\t\x12\x12\n\nlocal_port\x18\x03 \x01(\r\x12\x13\n\x0bremote_port\x18\x04 \x01(\r\x12\x11\n\tlocal_seq\x18\x05 \x01(\r\x12\x12\n\nremote_seq\x18\x06 \x01(\r\x12\x16\n\x0einit_local_seq\x18\x07 \x01(\r\x12\x11\n\tis_server\x18\x08 \x01(\x08\"-\n\x11tcpr_get_response\x12\x18\n\x07\x63lients\x18\x01 \x03(\x0b\x32\x07.client\"$\n\x08tcpr_set\x12\x18\n\x07\x63lients\x18\x01 \x03(\x0b\x32\x07.client\"X\n\x08tcpr_get\x12\x10\n\x08local_ip\x18\x01 \x01(\t\x12\x11\n\tremote_ip\x18\x02 \x01(\t\x12\x12\n\nlocal_port\x18\x03 \x01(\r\x12\x13\n\x0bremote_port\x18\x04 \x01(\r\"\x13\n\x11tcpr_set_response\"\x9d\x01\n\x04tcpr\x12\x18\n\x03get\x18\x01 \x01(\x0b\x32\t.tcpr_getH\x00\x12\x18\n\x03set\x18\x02 \x01(\x0b\x32\t.tcpr_setH\x00\x12*\n\x0cget_response\x18\x03 \x01(\x0b\x32\x12.tcpr_get_responseH\x00\x12*\n\x0cset_response\x18\x04 \x01(\x0b\x32\x12.tcpr_set_responseH\x00\x42\t\n\x07messageb\x06proto3')
+  serialized_pb=_b('\n\ntcpr.proto\"k\n\x08tcpr_set\x12\x10\n\x08local_ip\x18\x01 \x01(\t\x12\x11\n\tremote_ip\x18\x02 \x01(\t\x12\x12\n\nlocal_port\x18\x03 \x01(\r\x12\x13\n\x0bremote_port\x18\x04 \x01(\r\x12\x11\n\tis_server\x18\x05 \x01(\x08\"d\n\x14tcpr_get_initial_seq\x12\x10\n\x08local_ip\x18\x01 \x01(\t\x12\x11\n\tremote_ip\x18\x02 \x01(\t\x12\x12\n\nlocal_port\x18\x03 \x01(\r\x12\x13\n\x0bremote_port\x18\x04 \x01(\r\"\\\n\x0ctcpr_get_ack\x12\x10\n\x08local_ip\x18\x01 \x01(\t\x12\x11\n\tremote_ip\x18\x02 \x01(\t\x12\x12\n\nlocal_port\x18\x03 \x01(\r\x12\x13\n\x0bremote_port\x18\x04 \x01(\r\",\n\x11tcpr_set_response\x12\x17\n\x06status\x18\x01 \x01(\x0e\x32\x07.status\"M\n\x1dtcpr_get_initial_seq_response\x12\x17\n\x06status\x18\x01 \x01(\x0e\x32\x07.status\x12\x13\n\x0binitial_seq\x18\x02 \x01(\r\"E\n\x15tcpr_get_ack_response\x12\x17\n\x06status\x18\x01 \x01(\x0e\x32\x07.status\x12\x13\n\x0b\x63urrent_ack\x18\x02 \x01(\r\"\xa3\x02\n\x04tcpr\x12\x30\n\x0fget_initial_seq\x18\x01 \x01(\x0b\x32\x15.tcpr_get_initial_seqH\x00\x12\x42\n\x18get_initial_seq_response\x18\x02 \x01(\x0b\x32\x1e.tcpr_get_initial_seq_responseH\x00\x12 \n\x07get_ack\x18\x03 \x01(\x0b\x32\r.tcpr_get_ackH\x00\x12\x32\n\x10get_ack_response\x18\x04 \x01(\x0b\x32\x16.tcpr_get_ack_responseH\x00\x12\x18\n\x03set\x18\x05 \x01(\x0b\x32\t.tcpr_setH\x00\x12*\n\x0cset_response\x18\x06 \x01(\x0b\x32\x12.tcpr_set_responseH\x00\x42\t\n\x07message*4\n\x06status\x12\x0b\n\x07SUCCESS\x10\x00\x12\x11\n\rFAILED_EXISTS\x10\x01\x12\n\n\x06\x46\x41ILED\x10\x02\x62\x06proto3')
 )
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
+_STATUS = _descriptor.EnumDescriptor(
+  name='status',
+  full_name='status',
+  filename=None,
+  file=DESCRIPTOR,
+  values=[
+    _descriptor.EnumValueDescriptor(
+      name='SUCCESS', index=0, number=0,
+      options=None,
+      type=None),
+    _descriptor.EnumValueDescriptor(
+      name='FAILED_EXISTS', index=1, number=1,
+      options=None,
+      type=None),
+    _descriptor.EnumValueDescriptor(
+      name='FAILED', index=2, number=2,
+      options=None,
+      type=None),
+  ],
+  containing_type=None,
+  options=None,
+  serialized_start=809,
+  serialized_end=861,
+)
+_sym_db.RegisterEnumDescriptor(_STATUS)
+
+status = enum_type_wrapper.EnumTypeWrapper(_STATUS)
+SUCCESS = 0
+FAILED_EXISTS = 1
+FAILED = 2
 
 
 
-_CLIENT = _descriptor.Descriptor(
-  name='client',
-  full_name='client',
+_TCPR_SET = _descriptor.Descriptor(
+  name='tcpr_set',
+  full_name='tcpr_set',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='local_ip', full_name='client.local_ip', index=0,
+      name='local_ip', full_name='tcpr_set.local_ip', index=0,
       number=1, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='remote_ip', full_name='client.remote_ip', index=1,
+      name='remote_ip', full_name='tcpr_set.remote_ip', index=1,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='local_port', full_name='client.local_port', index=2,
+      name='local_port', full_name='tcpr_set.local_port', index=2,
       number=3, type=13, cpp_type=3, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='remote_port', full_name='client.remote_port', index=3,
+      name='remote_port', full_name='tcpr_set.remote_port', index=3,
       number=4, type=13, cpp_type=3, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='local_seq', full_name='client.local_seq', index=4,
-      number=5, type=13, cpp_type=3, label=1,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-    _descriptor.FieldDescriptor(
-      name='remote_seq', full_name='client.remote_seq', index=5,
-      number=6, type=13, cpp_type=3, label=1,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-    _descriptor.FieldDescriptor(
-      name='init_local_seq', full_name='client.init_local_seq', index=6,
-      number=7, type=13, cpp_type=3, label=1,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-    _descriptor.FieldDescriptor(
-      name='is_server', full_name='client.is_server', index=7,
-      number=8, type=8, cpp_type=7, label=1,
+      name='is_server', full_name='tcpr_set.is_server', index=4,
+      number=5, type=8, cpp_type=7, label=1,
       has_default_value=False, default_value=False,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -101,103 +111,41 @@ _CLIENT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=15,
-  serialized_end=183,
+  serialized_start=14,
+  serialized_end=121,
 )
 
 
-_TCPR_GET_RESPONSE = _descriptor.Descriptor(
-  name='tcpr_get_response',
-  full_name='tcpr_get_response',
+_TCPR_GET_INITIAL_SEQ = _descriptor.Descriptor(
+  name='tcpr_get_initial_seq',
+  full_name='tcpr_get_initial_seq',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='clients', full_name='tcpr_get_response.clients', index=0,
-      number=1, type=11, cpp_type=10, label=3,
-      has_default_value=False, default_value=[],
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-  ],
-  extensions=[
-  ],
-  nested_types=[],
-  enum_types=[
-  ],
-  options=None,
-  is_extendable=False,
-  syntax='proto3',
-  extension_ranges=[],
-  oneofs=[
-  ],
-  serialized_start=185,
-  serialized_end=230,
-)
-
-
-_TCPR_SET = _descriptor.Descriptor(
-  name='tcpr_set',
-  full_name='tcpr_set',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  fields=[
-    _descriptor.FieldDescriptor(
-      name='clients', full_name='tcpr_set.clients', index=0,
-      number=1, type=11, cpp_type=10, label=3,
-      has_default_value=False, default_value=[],
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-  ],
-  extensions=[
-  ],
-  nested_types=[],
-  enum_types=[
-  ],
-  options=None,
-  is_extendable=False,
-  syntax='proto3',
-  extension_ranges=[],
-  oneofs=[
-  ],
-  serialized_start=232,
-  serialized_end=268,
-)
-
-
-_TCPR_GET = _descriptor.Descriptor(
-  name='tcpr_get',
-  full_name='tcpr_get',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  fields=[
-    _descriptor.FieldDescriptor(
-      name='local_ip', full_name='tcpr_get.local_ip', index=0,
+      name='local_ip', full_name='tcpr_get_initial_seq.local_ip', index=0,
       number=1, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='remote_ip', full_name='tcpr_get.remote_ip', index=1,
+      name='remote_ip', full_name='tcpr_get_initial_seq.remote_ip', index=1,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='local_port', full_name='tcpr_get.local_port', index=2,
+      name='local_port', full_name='tcpr_get_initial_seq.local_port', index=2,
       number=3, type=13, cpp_type=3, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='remote_port', full_name='tcpr_get.remote_port', index=3,
+      name='remote_port', full_name='tcpr_get_initial_seq.remote_port', index=3,
       number=4, type=13, cpp_type=3, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
@@ -215,18 +163,46 @@ _TCPR_GET = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=270,
-  serialized_end=358,
+  serialized_start=123,
+  serialized_end=223,
 )
 
 
-_TCPR_SET_RESPONSE = _descriptor.Descriptor(
-  name='tcpr_set_response',
-  full_name='tcpr_set_response',
+_TCPR_GET_ACK = _descriptor.Descriptor(
+  name='tcpr_get_ack',
+  full_name='tcpr_get_ack',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
+    _descriptor.FieldDescriptor(
+      name='local_ip', full_name='tcpr_get_ack.local_ip', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='remote_ip', full_name='tcpr_get_ack.remote_ip', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='local_port', full_name='tcpr_get_ack.local_port', index=2,
+      number=3, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='remote_port', full_name='tcpr_get_ack.remote_port', index=3,
+      number=4, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
@@ -239,8 +215,115 @@ _TCPR_SET_RESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=360,
-  serialized_end=379,
+  serialized_start=225,
+  serialized_end=317,
+)
+
+
+_TCPR_SET_RESPONSE = _descriptor.Descriptor(
+  name='tcpr_set_response',
+  full_name='tcpr_set_response',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='status', full_name='tcpr_set_response.status', index=0,
+      number=1, type=14, cpp_type=8, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=319,
+  serialized_end=363,
+)
+
+
+_TCPR_GET_INITIAL_SEQ_RESPONSE = _descriptor.Descriptor(
+  name='tcpr_get_initial_seq_response',
+  full_name='tcpr_get_initial_seq_response',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='status', full_name='tcpr_get_initial_seq_response.status', index=0,
+      number=1, type=14, cpp_type=8, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='initial_seq', full_name='tcpr_get_initial_seq_response.initial_seq', index=1,
+      number=2, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=365,
+  serialized_end=442,
+)
+
+
+_TCPR_GET_ACK_RESPONSE = _descriptor.Descriptor(
+  name='tcpr_get_ack_response',
+  full_name='tcpr_get_ack_response',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='status', full_name='tcpr_get_ack_response.status', index=0,
+      number=1, type=14, cpp_type=8, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='current_ack', full_name='tcpr_get_ack_response.current_ack', index=1,
+      number=2, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=444,
+  serialized_end=513,
 )
 
 
@@ -252,29 +335,43 @@ _TCPR = _descriptor.Descriptor(
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='get', full_name='tcpr.get', index=0,
+      name='get_initial_seq', full_name='tcpr.get_initial_seq', index=0,
       number=1, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='set', full_name='tcpr.set', index=1,
+      name='get_initial_seq_response', full_name='tcpr.get_initial_seq_response', index=1,
       number=2, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='get_response', full_name='tcpr.get_response', index=2,
+      name='get_ack', full_name='tcpr.get_ack', index=2,
       number=3, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='set_response', full_name='tcpr.set_response', index=3,
+      name='get_ack_response', full_name='tcpr.get_ack_response', index=3,
       number=4, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='set', full_name='tcpr.set', index=4,
+      number=5, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='set_response', full_name='tcpr.set_response', index=5,
+      number=6, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -294,48 +391,45 @@ _TCPR = _descriptor.Descriptor(
       name='message', full_name='tcpr.message',
       index=0, containing_type=None, fields=[]),
   ],
-  serialized_start=382,
-  serialized_end=539,
+  serialized_start=516,
+  serialized_end=807,
 )
 
-_TCPR_GET_RESPONSE.fields_by_name['clients'].message_type = _CLIENT
-_TCPR_SET.fields_by_name['clients'].message_type = _CLIENT
-_TCPR.fields_by_name['get'].message_type = _TCPR_GET
+_TCPR_SET_RESPONSE.fields_by_name['status'].enum_type = _STATUS
+_TCPR_GET_INITIAL_SEQ_RESPONSE.fields_by_name['status'].enum_type = _STATUS
+_TCPR_GET_ACK_RESPONSE.fields_by_name['status'].enum_type = _STATUS
+_TCPR.fields_by_name['get_initial_seq'].message_type = _TCPR_GET_INITIAL_SEQ
+_TCPR.fields_by_name['get_initial_seq_response'].message_type = _TCPR_GET_INITIAL_SEQ_RESPONSE
+_TCPR.fields_by_name['get_ack'].message_type = _TCPR_GET_ACK
+_TCPR.fields_by_name['get_ack_response'].message_type = _TCPR_GET_ACK_RESPONSE
 _TCPR.fields_by_name['set'].message_type = _TCPR_SET
-_TCPR.fields_by_name['get_response'].message_type = _TCPR_GET_RESPONSE
 _TCPR.fields_by_name['set_response'].message_type = _TCPR_SET_RESPONSE
 _TCPR.oneofs_by_name['message'].fields.append(
-  _TCPR.fields_by_name['get'])
-_TCPR.fields_by_name['get'].containing_oneof = _TCPR.oneofs_by_name['message']
+  _TCPR.fields_by_name['get_initial_seq'])
+_TCPR.fields_by_name['get_initial_seq'].containing_oneof = _TCPR.oneofs_by_name['message']
+_TCPR.oneofs_by_name['message'].fields.append(
+  _TCPR.fields_by_name['get_initial_seq_response'])
+_TCPR.fields_by_name['get_initial_seq_response'].containing_oneof = _TCPR.oneofs_by_name['message']
+_TCPR.oneofs_by_name['message'].fields.append(
+  _TCPR.fields_by_name['get_ack'])
+_TCPR.fields_by_name['get_ack'].containing_oneof = _TCPR.oneofs_by_name['message']
+_TCPR.oneofs_by_name['message'].fields.append(
+  _TCPR.fields_by_name['get_ack_response'])
+_TCPR.fields_by_name['get_ack_response'].containing_oneof = _TCPR.oneofs_by_name['message']
 _TCPR.oneofs_by_name['message'].fields.append(
   _TCPR.fields_by_name['set'])
 _TCPR.fields_by_name['set'].containing_oneof = _TCPR.oneofs_by_name['message']
 _TCPR.oneofs_by_name['message'].fields.append(
-  _TCPR.fields_by_name['get_response'])
-_TCPR.fields_by_name['get_response'].containing_oneof = _TCPR.oneofs_by_name['message']
-_TCPR.oneofs_by_name['message'].fields.append(
   _TCPR.fields_by_name['set_response'])
 _TCPR.fields_by_name['set_response'].containing_oneof = _TCPR.oneofs_by_name['message']
-DESCRIPTOR.message_types_by_name['client'] = _CLIENT
-DESCRIPTOR.message_types_by_name['tcpr_get_response'] = _TCPR_GET_RESPONSE
 DESCRIPTOR.message_types_by_name['tcpr_set'] = _TCPR_SET
-DESCRIPTOR.message_types_by_name['tcpr_get'] = _TCPR_GET
+DESCRIPTOR.message_types_by_name['tcpr_get_initial_seq'] = _TCPR_GET_INITIAL_SEQ
+DESCRIPTOR.message_types_by_name['tcpr_get_ack'] = _TCPR_GET_ACK
 DESCRIPTOR.message_types_by_name['tcpr_set_response'] = _TCPR_SET_RESPONSE
+DESCRIPTOR.message_types_by_name['tcpr_get_initial_seq_response'] = _TCPR_GET_INITIAL_SEQ_RESPONSE
+DESCRIPTOR.message_types_by_name['tcpr_get_ack_response'] = _TCPR_GET_ACK_RESPONSE
 DESCRIPTOR.message_types_by_name['tcpr'] = _TCPR
-
-client = _reflection.GeneratedProtocolMessageType('client', (_message.Message,), dict(
-  DESCRIPTOR = _CLIENT,
-  __module__ = 'tcpr_pb2'
-  # @@protoc_insertion_point(class_scope:client)
-  ))
-_sym_db.RegisterMessage(client)
-
-tcpr_get_response = _reflection.GeneratedProtocolMessageType('tcpr_get_response', (_message.Message,), dict(
-  DESCRIPTOR = _TCPR_GET_RESPONSE,
-  __module__ = 'tcpr_pb2'
-  # @@protoc_insertion_point(class_scope:tcpr_get_response)
-  ))
-_sym_db.RegisterMessage(tcpr_get_response)
+DESCRIPTOR.enum_types_by_name['status'] = _STATUS
 
 tcpr_set = _reflection.GeneratedProtocolMessageType('tcpr_set', (_message.Message,), dict(
   DESCRIPTOR = _TCPR_SET,
@@ -344,12 +438,19 @@ tcpr_set = _reflection.GeneratedProtocolMessageType('tcpr_set', (_message.Messag
   ))
 _sym_db.RegisterMessage(tcpr_set)
 
-tcpr_get = _reflection.GeneratedProtocolMessageType('tcpr_get', (_message.Message,), dict(
-  DESCRIPTOR = _TCPR_GET,
+tcpr_get_initial_seq = _reflection.GeneratedProtocolMessageType('tcpr_get_initial_seq', (_message.Message,), dict(
+  DESCRIPTOR = _TCPR_GET_INITIAL_SEQ,
   __module__ = 'tcpr_pb2'
-  # @@protoc_insertion_point(class_scope:tcpr_get)
+  # @@protoc_insertion_point(class_scope:tcpr_get_initial_seq)
   ))
-_sym_db.RegisterMessage(tcpr_get)
+_sym_db.RegisterMessage(tcpr_get_initial_seq)
+
+tcpr_get_ack = _reflection.GeneratedProtocolMessageType('tcpr_get_ack', (_message.Message,), dict(
+  DESCRIPTOR = _TCPR_GET_ACK,
+  __module__ = 'tcpr_pb2'
+  # @@protoc_insertion_point(class_scope:tcpr_get_ack)
+  ))
+_sym_db.RegisterMessage(tcpr_get_ack)
 
 tcpr_set_response = _reflection.GeneratedProtocolMessageType('tcpr_set_response', (_message.Message,), dict(
   DESCRIPTOR = _TCPR_SET_RESPONSE,
@@ -357,6 +458,20 @@ tcpr_set_response = _reflection.GeneratedProtocolMessageType('tcpr_set_response'
   # @@protoc_insertion_point(class_scope:tcpr_set_response)
   ))
 _sym_db.RegisterMessage(tcpr_set_response)
+
+tcpr_get_initial_seq_response = _reflection.GeneratedProtocolMessageType('tcpr_get_initial_seq_response', (_message.Message,), dict(
+  DESCRIPTOR = _TCPR_GET_INITIAL_SEQ_RESPONSE,
+  __module__ = 'tcpr_pb2'
+  # @@protoc_insertion_point(class_scope:tcpr_get_initial_seq_response)
+  ))
+_sym_db.RegisterMessage(tcpr_get_initial_seq_response)
+
+tcpr_get_ack_response = _reflection.GeneratedProtocolMessageType('tcpr_get_ack_response', (_message.Message,), dict(
+  DESCRIPTOR = _TCPR_GET_ACK_RESPONSE,
+  __module__ = 'tcpr_pb2'
+  # @@protoc_insertion_point(class_scope:tcpr_get_ack_response)
+  ))
+_sym_db.RegisterMessage(tcpr_get_ack_response)
 
 tcpr = _reflection.GeneratedProtocolMessageType('tcpr', (_message.Message,), dict(
   DESCRIPTOR = _TCPR,

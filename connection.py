@@ -191,13 +191,6 @@ class Connection:
             return _accept(pkt, ip)
         return _drop(pkt, ip)
 
-    @register_state(STATES.CLOSED, incomming)
-    def on_closed_incomming(self, pkt, ip, tcp):
-        if tcp.flags & SYN:
-            self.state = STATES.SYN_RECV
-            return _accept(pkt, ip)
-        return _drop(pkt, ip)
-
     @register_state(STATES.FIN_WAIT_1, incomming)
     def on_fin_wait_1(self, pkt, ip, tcp):
         # we dont distinguesh between fin_wait_1 and fin_wait_2
@@ -315,7 +308,7 @@ class Connection:
     def reset(self):
         pass
 
-def get_connection(local_addr, remote_addr, local_port, remote_port):
+def get_connection_peer(local_addr, remote_addr, local_port, remote_port):
     for connection in connections:
         if connection.local_addr == local_addr and \
             connection.remote_addr == remote_addr and \
@@ -323,6 +316,17 @@ def get_connection(local_addr, remote_addr, local_port, remote_port):
             connection.remote_port == remote_port:
                 return connection
     return None
+
+
+def get_connection_application(local_addr, remote_addr, local_port, remote_port):
+    for connection in connections:
+        if connection.local_addr == local_addr and \
+            connection.remote_addr == remote_addr and \
+            connection.local_port == local_port and \
+            connection.remote_port == remote_port:
+                return connection
+    return None
+
 
 
 def get_dup_connection(local_addr, remote_addr, local_port):
