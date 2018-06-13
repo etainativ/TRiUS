@@ -103,12 +103,12 @@ class Connection:
 
     def update_tcp(self, pkt, ip, tcp, is_ongoing):
         if is_ongoing:
-            tcp.seq = (tcp.seq - self.delta) % (2 ** 32)
+            tcp.seq -= self.delta
             tcp.sport = self.initial_local_port
 
         else:
             self.local_seq = tcp.ack
-            tcp.ack = (tcp.ack + self.delta) % (2 ** 32)
+            tcp.ack += self.delta
             tcp.dport = self.local_port
 
         del(tcp.chksum)
@@ -138,24 +138,14 @@ class Connection:
 
     @register_state(STATES.SYN_RECV, outgoing)
     def on_syn_rcv_outgoing(self, pkt, ip, tcp):
-        if ACK & tcp.flags:
-            if SYN & tcp.flags:
-                self.recover_ack(tcp)
-            else:
-                self.state = STATES.ESTABLISHED
-        if RST & tcp.flags:
-            self.state = STATES.CLOSED
-            return _accept(pkt, ip)
+        if ACK | SYN == tcp.flags:
+            self.recover_ack(tcp)
         return _drop(pkt, ip)
 
     @register_state(STATES.SYN_RECV, incomming)
     def on_syn_rcv_outgoing(self, pkt, ip, tcp):
         if ACK == tcp.flags:
             self.state = STATES.ESTABLISHED
-            return _accept(pkt, ip)
-
-        # some cases we match the packets going on the LO
-        if ACK | SYN == tcp.flags:
             return _accept(pkt, ip)
         return _drop(pkt, ip)
 
@@ -169,16 +159,12 @@ class Connection:
 
     @register_state(STATES.RECOVER, incomming)
     def on_recover_incomming(self, pkt, ip, tcp):
-        if tcp.flags & RST:
-            print("Session RESTED by peer")
-            connections.pop(self)
-
         if tcp.flags == ACK:
             # because in some cases the syn ack wont register
             # we skip the syn_sent state and assume the
             # application got the SYN-ACK
             self.recover_syn_ack_local(tcp)
-            self.state = STATES.SYN_RECV
+            self.state = STATES.SYN_SENT
         
         return _drop(pkt, ip)
 
@@ -195,14 +181,14 @@ class Connection:
 
     @register_state(STATES.SYN_SENT, incomming)
     def on_syn_sent_incomming(self, pkt, ip, tcp):
-        if tcp.flags & SYN and tcp.flags & ACK:
-            self.state = STATES.SYN_RECV
+        if tcp.flags == SYN | ACK:
             return _accept(pkt, ip)
-        
-        if tcp.flags & ACK:
+        return _drop(pkt, ip)
+
+    @register_state(STATES.SYN_SENT, outgoing)
+    def on_syn_sent_outgoing(self, pkt, ip, tcp):
+        if tcp.flags == ACK:
             self.state = STATES.ESTABLISHED
-            # should look into validity of the pkt
-            return _accept(pkt, ip)
         return _drop(pkt, ip)
 
     @register_state(STATES.FIN_WAIT_1, incomming)
@@ -224,10 +210,19 @@ class Connection:
         return _accept(pkt, ip)
 
     def pkt_incomming(self, pkt, ip, tcp):
+        if tcp.flags & RST:
+            print("Session RESETED by peer")
+            connections.pop(connections.index(self))
+            return _accept(pkt, ip)
+
         func = self.incomming.get(self.state, self.pass_pkt_incomming)
         return func(self, pkt, ip ,tcp)
 
     def pkt_outgoing(self, pkt, ip, tcp):
+        if tcp.flags & RST:
+            self.state = STATES.CLOSED
+            return _drop(pkt, ip)
+
         func = self.outgoing.get(self.state, self.pass_pkt_outgoing)
         return func(self, pkt, ip, tcp)
         
