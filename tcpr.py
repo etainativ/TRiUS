@@ -89,8 +89,22 @@ def tcpr_application(pkt, ip):
         # SYN + ACK for incomming connection
         con = Connection(ip.src, ip.dst, tcp.sport, tcp.dport, True) 
 
-        pp("new Connection:", ip)
+        options = dict(tcp.options)
+        sack = 1 if "SAckOK" in options else 0
+        mss = options.get("MSS", None)
+        wscale = options.get("WScale", None)
+        con = Connection(
+                local_ip=ip.src,
+                remote_ip=ip.dst,
+                local_port=tcp.sport,
+                remote_port=tcp.dport,
+                is_bind=False,
+                mss=mss,
+                ws=wscale,
+                sack=sack,
+                initial_seq=tcp.seq + 1)
         con.register()
+        pp("New Connect:", ip, con)
 
     return _accept(pkt, ip)
 
@@ -114,8 +128,19 @@ def tcpr_peer(pkt, ip):
         options = dict(tcp.options)
         sack = 1 if "SAckOK" in options else 0
         mss = options.get("MSS", None)
-        WScale = options.get("WScale", None)
-        
+        wscale = options.get("WScale", None)
+        con = Connection(
+                local_ip=ip.dst,
+                remote_ip=ip.src,
+                local_port=tcp.dport,
+                remote_port=tcp.sport,
+                is_bind=True,
+                mss=mss,
+                ws=wscale,
+                sack=sack)
+        con.register()
+        pp("New Accept:", ip, con)
+
     pp("Peer:", ip, con)
 
     if con is not None:
@@ -174,12 +199,15 @@ def get_init_response(con):
             con.local_port,
             con.remote_port)
 
-    if con is None:
-        msg.tcpr_get_ack_response.status = tcpr_pb2.FAILED_NOT_FOUND
+    if connection is None:
+        msg.get_init_response.status = tcpr_pb2.FAILED_NOT_FOUND
         return msg.SerializeToString()
 
-    msg.tcpr_get_ack_response.initial_seq = con.initial_seq
-    msg.tcpr_get_ack_response.status = tcpr_pb2.SUCCESS
+    msg.get_init_response.initial_seq = connection.initial_seq
+    msg.get_init_response.sack_enabled = connection.sack
+    msg.get_init_response.max_segment_size = connection.mss
+    msg.get_init_response.window_scaling = connection.ws
+    msg.get_init_response.status = tcpr_pb2.SUCCESS
     return msg.SerializeToString()
 
 def get_ack_response(con):
@@ -188,39 +216,57 @@ def get_ack_response(con):
             con.local_ip,
             con.remote_ip,
             con.local_port,
-            con.remote_por)
+            con.remote_port)
 
-    if con is None:
-        msg.tcpr_get_ack_response.status = tcpr_pb2.FAILED_NOT_FOUND
+    if connection is None:
+        msg.get_ack_response.status = tcpr_pb2.FAILED_NOT_FOUND
         return msg.SerializeToString()
 
-    msg.tcpr_get_ack_response.current_ack = con.local_seq
-    msg.tcpr_get_ack_response.status = tcpr_pb2.SUCCESS
+    msg.get_ack_response.current_ack = connection.local_seq
+    msg.get_ack_response.status = tcpr_pb2.SUCCESS
     return msg.SerializeToString()
 
-def set_connections(con):
-    resp = tcpr()
+def set_connections(set_msg):
+    resp = tcpr_pb2.tcpr()
+    con = set_msg.connection
 
     if get_old_connection(
         con.local_ip,
         con.remote_ip,
         con.remote_port) is not None:
-        resp.set_response.response = tcpr_pb2.FAILED_EXISTS
+        resp.set_response.status = tcpr_pb2.FAILED_EXISTS
         return resp.SerializeToString()
             
-    con = Connection(
+    connection = Connection(
             local_ip=con.local_ip,
             remote_ip=con.remote_ip,
             local_port=con.local_port,
             remote_port=con.remote_port,
             is_bind=False,
-            mss=con.max_segment_size,
-            ws=con.window_scaling,
-            sack=sack_enabled)
-    con.register()
-    con.recover()
+            mss=set_msg.max_segment_size,
+            ws=set_msg.window_scaling,
+            sack=set_msg.sack_enabled)
+    connection.register()
+    connection.recover()
         
-    resp.set_response.response = tcpr_pb2.SUCCESS 
+    resp.set_response.status = tcpr_pb2.SUCCESS 
+    return resp.SerializeToString()
+
+def create_list_response():
+    resp = tcpr_pb2.tcpr()
+    
+    for connection in connections:
+        entry = tcpr_pb2.tcpr_set()
+        entry.connection.local_ip = connection.local_addr
+        entry.connection.remote_ip = connection.remote_addr
+        entry.connection.local_port = connection.local_port
+        entry.connection.remote_port = connection.remote_port
+        entry.sack_enabled = connection.sack
+        entry.max_segment_size = connection.mss
+        entry.window_scaling = connection.ws
+        resp.get_list_response.connections.extend([entry])
+    
+
     return resp.SerializeToString()
 
 def control_server():
@@ -231,14 +277,17 @@ def control_server():
         gevent.socket.wait_read(s.recv_fd)
         msg = tcpr_pb2.tcpr.FromString(s.recv())
         mtype = msg.WhichOneof('message')
+        if mtype == 'get_list':
+            s.send(create_list_response())
+
         if mtype == 'get_init':
-            s.send(get_init_response(msg.tcpr_get_init))
+            s.send(get_init_response(msg.get_init.connection))
 
         if mtype == 'get_ack':
-            s.send(get_ack_response(msg.tcpr_get_ack))
+            s.send(get_ack_response(msg.get_ack.connection))
 
         if mtype == 'set':
-            s.send(set_connections(msg.tcpr_set))
+            s.send(set_connections(msg.set))
 
 
 if __name__ == "__main__":

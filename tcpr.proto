@@ -7,28 +7,34 @@ enum status {
 	FAILED = 3;
 };
 
-message tcpr_set {
+
+message four_tuple {
 	string local_ip = 1;
 	string remote_ip = 2;
 	uint32 local_port = 3;
 	uint32 remote_port = 4;
-	uint32 sack_enabled = 5;
-	uint32 max_segment_size = 6;
-	uint32 window_scaling = 7;
+}
+
+message tcpr_set {
+	four_tuple connection = 1;
+	uint32 sack_enabled = 2;
+	uint32 max_segment_size = 3;
+	uint32 window_scaling = 4;
 }
 
 message tcpr_get_init {
-	string local_ip = 1;
-	string remote_ip = 2;
-	uint32 local_port = 3;
-	uint32 remote_port = 4;
+	four_tuple connection = 1;
 }
 
 message tcpr_get_ack {
-	string local_ip = 1;
-	string remote_ip = 2;
-	uint32 local_port = 3;
-	uint32 remote_port = 4;
+	four_tuple connection = 1;
+}
+
+message tcpr_get_list {
+}
+
+message tcpr_get_list_response {
+	repeated tcpr_set connections = 1;
 }
 
 message tcpr_set_response {
@@ -54,7 +60,9 @@ message tcpr {
 		tcpr_get_init_response				get_init_response= 2;
 		tcpr_get_ack									get_ack = 3;
 		tcpr_get_ack_response					get_ack_response = 4;
-		tcpr_set											set = 5;
-		tcpr_set_response							set_response = 6;
+		tcpr_get_list									get_list = 5;	
+		tcpr_get_list_response				get_list_response = 6;
+		tcpr_set											set = 7;
+		tcpr_set_response							set_response = 8;
 	}
 }

@@ -49,6 +49,7 @@ class Connection:
             'remote_addr',
             'remote_port',
             'initial_local_port',
+            'initial_seq',
             'local_seq',
             'is_bind',
             'socket_type',
@@ -68,7 +69,8 @@ class Connection:
             is_bind,
             mss=0,
             ws=0,
-            sack=0):
+            sack=0,
+            initial_seq=0):
         self.local_addr = local_ip
         self.local_port = local_port
         self.remote_addr = remote_ip
@@ -80,6 +82,7 @@ class Connection:
         self.mss = mss
         self.ws = ws
         self.sack = sack
+        self.initial_seq = initial_seq
 
         is_v6 = ipaddress.ip_address(self.remote_addr).version == 6
         self.socket_type = L3RawSocket6 if is_v6 else L3RawSocket
@@ -103,12 +106,12 @@ class Connection:
 
     def update_tcp(self, pkt, ip, tcp, is_ongoing):
         if is_ongoing:
-            tcp.seq -= self.delta
+            tcp.seq = (tcp.seq - self.delta) % (2 ** 32)
             tcp.sport = self.initial_local_port
 
         else:
             self.local_seq = tcp.ack
-            tcp.ack += self.delta
+            tcp.ack = (tcp.ack + self.delta) % (2 ** 32)
             tcp.dport = self.local_port
 
         del(tcp.chksum)

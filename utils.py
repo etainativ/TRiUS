@@ -6,7 +6,7 @@ def pp(msg, ip, con=None):
             msg, ip.src, tcp.sport, ip.dst, tcp.dport,
             tcp.flags.flagrepr(), tcp.seq, tcp.ack)
     if con is not None:
-        msg += ", state: {}".format(con.state)
+        msg += ", {:12}".format(con.state)
     print(msg)
 
 def _drop(pkt, ip):
