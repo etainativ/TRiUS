@@ -110,6 +110,12 @@ def tcpr_peer(pkt, ip):
     if con is None:
         con = get_old_connection(ip.dst, ip.src, tcp.sport)
 
+    if con is None and tcp.flags == "S":
+        options = dict(tcp.options)
+        sack = 1 if "SAckOK" in options else 0
+        mss = options.get("MSS", None)
+        WScale = options.get("WScale", None)
+        
     pp("Peer:", ip, con)
 
     if con is not None:
@@ -160,7 +166,7 @@ def keypress():
         except Exception as e:
             print(e)
 
-def get_initial_seq_response(con):
+def get_init_response(con):
     msg = tcpr_pb2.tcpr()
     connection = get_connection_peer(
             con.local_ip,
@@ -207,7 +213,10 @@ def set_connections(con):
             remote_ip=con.remote_ip,
             local_port=con.local_port,
             remote_port=con.remote_port,
-            is_bind=con.is_server)
+            is_bind=False,
+            mss=con.max_segment_size,
+            ws=con.window_scaling,
+            sack=sack_enabled)
     con.register()
     con.recover()
         
@@ -222,8 +231,8 @@ def control_server():
         gevent.socket.wait_read(s.recv_fd)
         msg = tcpr_pb2.tcpr.FromString(s.recv())
         mtype = msg.WhichOneof('message')
-        if mtype == 'get_initial_seq':
-            s.send(get_initial_seq_response(msg.tcpr_get_initial_seq))
+        if mtype == 'get_init':
+            s.send(get_init_response(msg.tcpr_get_init))
 
         if mtype == 'get_ack':
             s.send(get_ack_response(msg.tcpr_get_ack))

@@ -12,11 +12,12 @@ message tcpr_set {
 	string remote_ip = 2;
 	uint32 local_port = 3;
 	uint32 remote_port = 4;
-	bool is_server = 5;
+	uint32 sack_enabled = 5;
+	uint32 max_segment_size = 6;
+	uint32 window_scaling = 7;
 }
 
-
-message tcpr_get_initial_seq {
+message tcpr_get_init {
 	string local_ip = 1;
 	string remote_ip = 2;
 	uint32 local_port = 3;
@@ -34,9 +35,12 @@ message tcpr_set_response {
 	status status = 1;
 }
 
-message tcpr_get_initial_seq_response {
+message tcpr_get_init_response {
 	status status = 1;
 	uint32 initial_seq = 2;
+	uint32 sack_enabled = 3;
+	uint32 max_segment_size = 4;
+	uint32 window_scaling = 5;
 }
 
 message tcpr_get_ack_response {
@@ -46,8 +50,8 @@ message tcpr_get_ack_response {
 
 message tcpr {
 	oneof message {
-		tcpr_get_initial_seq					get_initial_seq= 1;
-		tcpr_get_initial_seq_response get_initial_seq_response= 2;
+		tcpr_get_init									get_init = 1;
+		tcpr_get_init_response				get_init_response= 2;
 		tcpr_get_ack									get_ack = 3;
 		tcpr_get_ack_response					get_ack_response = 4;
 		tcpr_set											set = 5;

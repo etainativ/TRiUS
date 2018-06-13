@@ -51,11 +51,13 @@ class Connection:
             'initial_local_port',
             'local_seq',
             'is_bind',
-            'is_v6',
             'socket_type',
             'ip_type',
             'state',
-            'delta']
+            'delta',
+            'mss',
+            'ws',
+            'sack']
 
     def __init__(
             self,
@@ -64,15 +66,20 @@ class Connection:
             local_port,
             remote_port,
             is_bind,
-            local_seq=0):
+            mss=0,
+            ws=0,
+            sack=0):
         self.local_addr = local_ip
         self.local_port = local_port
         self.remote_addr = remote_ip
         self.remote_port = remote_port
         self.initial_local_port = local_port
         self.delta = 0
+        self.local_seq = 0
         self.is_bind = is_bind
-        self.local_seq = local_seq 
+        self.mss = mss
+        self.ws = ws
+        self.sack = sack
 
         is_v6 = ipaddress.ip_address(self.remote_addr).version == 6
         self.socket_type = L3RawSocket6 if is_v6 else L3RawSocket
@@ -96,12 +103,12 @@ class Connection:
 
     def update_tcp(self, pkt, ip, tcp, is_ongoing):
         if is_ongoing:
-            tcp.seq -= self.delta
+            tcp.seq = (tcp.seq - self.delta) % (2 ** 32)
             tcp.sport = self.initial_local_port
 
         else:
             self.local_seq = tcp.ack
-            tcp.ack += self.delta
+            tcp.ack = (tcp.ack + self.delta) % (2 ** 32)
             tcp.dport = self.local_port
 
         del(tcp.chksum)
@@ -146,6 +153,10 @@ class Connection:
         if ACK == tcp.flags:
             self.state = STATES.ESTABLISHED
             return _accept(pkt, ip)
+
+        # some cases we match the packets going on the LO
+        if ACK | SYN == tcp.flags:
+            return _accept(pkt, ip)
         return _drop(pkt, ip)
 
     @register_state(STATES.CLOSED, outgoing)
@@ -163,8 +174,11 @@ class Connection:
             connections.pop(self)
 
         if tcp.flags == ACK:
-            self.state = STATES.SYN_SENT
+            # because in some cases the syn ack wont register
+            # we skip the syn_sent state and assume the
+            # application got the SYN-ACK
             self.recover_syn_ack_local(tcp)
+            self.state = STATES.SYN_RECV
         
         return _drop(pkt, ip)
 

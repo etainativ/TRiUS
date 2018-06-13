@@ -14,6 +14,8 @@ ip netns exec a2 ip l set up p2
 iptables -I OUTPUT -o lo -j ACCEPT
 iptables -A OUTPUT -p tcp -m tcp --sport 1234 -j NFQUEUE --queue-num 0
 iptables -A OUTPUT -p tcp -m tcp --dport 1234 -j NFQUEUE --queue-num 0
+iptables -A OUTPUT -m mark --mark 0xb3 -j NFQUEUE --queue-num 0
+iptables -A OUTPUT -m mark --mark 0xb3 -j NFQUEUE --queue-num 0
 iptables -A INPUT -p tcp -m tcp --dport 1234 -j NFQUEUE --queue-num 1
 iptables -A INPUT -p tcp -m tcp --sport 1234 -j NFQUEUE --queue-num 1
 
